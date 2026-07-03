@@ -9,9 +9,10 @@ class URL(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, nullable=False, index=True)
     campaign_id = Column(Integer, nullable=False, index=True)
-    original_url  = Column(String(2048), nullable=False)
+    original_url = Column(String(2048), nullable=False)
     short_code = Column(String(8), nullable=False, unique=True, index=True)
-    created_at = Column(DateTime(timezone=True),server_default=func.now(),nullable=False)
+    created_at = Column(DateTime(timezone=True),
+                        server_default=func.now(), nullable=False)
 
-    logs = relationship("Log",back_populates="url",cascade="all, delete-orphan")
-
+    logs = relationship("Log", back_populates="url",
+                        cascade="all, delete-orphan")
