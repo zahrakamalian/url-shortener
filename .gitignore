@@ -42,10 +42,4 @@ htmlcov/
 
 # Docker 
 *.pid
-*.yml
 
-# Files
-src/api/v1/campaigns.py
-src/api/v1/users.py
-src/schemas/campaign.py
-src/schemas/user.py

@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:17
+    container_name: url-shortener-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: url_shortener
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: url-shortener-app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:1234@db:5432/url_shortener
+    volumes:
+      - .:/app
+    command: >
+      uvicorn src.main:app --host 0.0.0.0 --port 8000
+volumes:
+  postgres_data:
