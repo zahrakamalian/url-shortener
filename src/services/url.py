@@ -55,15 +55,19 @@ class URLService:
             )
 
         try:
-            log_entry = Log(
-                url_id=url.id,
-                ip_address=ip
-            )
-            self.log_repo.add(log_entry)
-            self.url_repo.increment_views(url)
-            self.db.commit()
+            with self.db.begin():
+                log_entry = Log(
+                    url_id=url.id,
+                    ip_address=ip,
+                )
+
+                self.log_repo.add(log_entry)
+                self.url_repo.increment_views(url)
 
         except IntegrityError:
-            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update URL statistics."
+            )
 
         return url.original_url
