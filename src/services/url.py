@@ -1,5 +1,6 @@
 from nanoid import generate
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from src.repositories.url import URLRepository
@@ -17,7 +18,8 @@ def generate_short_code() -> str:
 
 
 class URLService:
-    def __init__(self, url_repository: URLRepository, log_repository: LogRepository):
+    def __init__(self, db: Session, url_repository: URLRepository, log_repository: LogRepository):
+        self.db = db
         self.url_repo = url_repository
         self.log_repo = log_repository
 
@@ -30,12 +32,14 @@ class URLService:
                 short_code=generate_short_code()
             )
             try:
-                created_url = self.url_repo.create_url(url_entry)
+                created_url = self.url_repo.add(url_entry)
+                self.db.commit()
                 return CreateURLResponse(
                     short_code=created_url.short_code
                 )
+
             except IntegrityError:
-                self.url_repo.rollback()
+                self.db.rollback()
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -49,14 +53,17 @@ class URLService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Invalid link."
             )
+
         try:
             log_entry = Log(
                 url_id=url.id,
                 ip_address=ip
             )
-            self.log_repo.create_log(log_entry)
+            self.log_repo.add(log_entry)
+            self.url_repo.increment_views(url)
+            self.db.commit()
 
         except IntegrityError:
-            self.log_repo.rollback()
+            self.db.rollback()
 
         return url.original_url

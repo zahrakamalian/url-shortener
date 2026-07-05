@@ -20,16 +20,18 @@ def get_log_repository(db: DBSession) -> LogRepository:
     return LogRepository(db)
 
 
-def get_url_service(url_repo: Annotated[URLRepository, Depends(get_url_repository)],
+def get_url_service(db: DBSession,
+                    url_repo: Annotated[URLRepository, Depends(get_url_repository)],
                     log_repo: Annotated[LogRepository, Depends(get_log_repository)]) -> URLService:
     return URLService(
+        db=db,
         url_repository=url_repo,
         log_repository=log_repo,
     )
 
 
 def get_analytics_service(url_repo: Annotated[URLRepository, Depends(get_url_repository)],
-                          log_repo: Annotated[LogRepository, Depends(get_log_repository)]) -> URLService:
+                          log_repo: Annotated[LogRepository, Depends(get_log_repository)]) -> AnalyticsService:
     return AnalyticsService(
         url_repository=url_repo,
         log_repository=log_repo,

@@ -8,14 +8,9 @@ class URLRepository():
     def __init__(self, db: Session):
         self.db = db
 
-    def create_url(self, url: URL) -> URL:
+    def add(self, url: URL) -> URL:
         self.db.add(url)
-        self.db.commit()
-        self.db.refresh(url)
         return url
-
-    def rollback(self) -> None:
-        self.db.rollback()
 
     def get_by_short_code(self, short_code: str) -> URL | None:
         return self.db.query(URL).filter(URL.short_code == short_code).first()
@@ -38,3 +33,6 @@ class URLRepository():
         rows = self.db.query(URL.campaign_id).join(Log, Log.url_id == URL.id).filter(
             URL.user_id == user_id).distinct().all()
         return [row[0] for row in rows]
+
+    def increment_views(self, url: URL):
+        url.views += 1

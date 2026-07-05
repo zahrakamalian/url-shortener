@@ -13,6 +13,7 @@ class URL(Base):
     short_code = Column(String(8), nullable=False, unique=True, index=True)
     created_at = Column(DateTime(timezone=True),
                         server_default=func.now(), nullable=False)
+    views = Column(Integer, default=0, nullable=False)
 
     logs = relationship("Log", back_populates="url",
                         cascade="all, delete-orphan")
