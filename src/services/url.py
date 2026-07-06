@@ -2,6 +2,7 @@ from nanoid import generate
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
+from threading import Semaphore
 
 from src.repositories.url import URLRepository
 from src.repositories.log import LogRepository
@@ -22,6 +23,8 @@ class URLService:
         self.db = db
         self.url_repo = url_repository
         self.log_repo = log_repository
+
+        self.semaphore = Semaphore(200)
 
     def create_short_url(self, request: CreateURLRequest) -> CreateURLResponse:
         for _ in range(MAX_RETRIES):
@@ -47,27 +50,30 @@ class URLService:
         )
 
     def redirect(self, short_code: str, ip: str) -> str:
-        url = self.url_repo.get_by_short_code(short_code)
-        if not url:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Invalid link."
-            )
+        with self.semaphore:
+            try:
+                url = self.url_repo.get_by_short_code(short_code)
 
-        try:
-            with self.db.begin():
+                if not url:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Invalid link."
+                    )
+
                 log_entry = Log(
                     url_id=url.id,
                     ip_address=ip,
                 )
 
                 self.log_repo.add(log_entry)
-                self.url_repo.increment_views(url)
+                self.url_repo.increment_views(url.id)
 
-        except IntegrityError:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to update URL statistics."
-            )
+                self.db.commit()
 
-        return url.original_url
+                return url.original_url
+
+            except IntegrityError:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to update URL statistics."
+                )

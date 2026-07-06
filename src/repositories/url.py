@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import update
 
 from src.db.models.url import URL
 from src.db.models.log import Log
@@ -34,5 +35,6 @@ class URLRepository():
             URL.user_id == user_id).distinct().all()
         return [row[0] for row in rows]
 
-    def increment_views(self, url: URL):
-        url.views += 1
+    def increment_views(self, url_id: int) -> None:
+        self.db.execute(update(URL).where(
+            URL.id == url_id).values(views=URL.views + 1))

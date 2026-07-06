@@ -6,3 +6,5 @@ psycopg[binary]
 alembic
 pydantic
 pydantic-settings
+faker
+locust
