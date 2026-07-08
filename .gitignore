@@ -43,5 +43,5 @@ htmlcov/
 # Docker 
 *.pid
 
-fake-data/
+fake-data/data
 locustfile.py

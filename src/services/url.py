@@ -2,13 +2,14 @@ from nanoid import generate
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-from threading import Semaphore
 
 from src.repositories.url import URLRepository
 from src.repositories.log import LogRepository
 from src.schemas.url import CreateURLRequest, CreateURLResponse
 from src.db.models.url import URL
 from src.db.models.log import Log
+from src.core.semaphore_instance import redirect_semaphore
+from src.core.semaphore import SemaphoreLimitExceeded
 
 SHORT_CODE_LENGTH = 7
 MAX_RETRIES = 3
@@ -23,8 +24,6 @@ class URLService:
         self.db = db
         self.url_repo = url_repository
         self.log_repo = log_repository
-
-        self.semaphore = Semaphore(200)
 
     def create_short_url(self, request: CreateURLRequest) -> CreateURLResponse:
         for _ in range(MAX_RETRIES):
@@ -50,16 +49,15 @@ class URLService:
         )
 
     def redirect(self, short_code: str, ip: str) -> str:
-        with self.semaphore:
-            try:
-                url = self.url_repo.get_by_short_code(short_code)
+        url = self.url_repo.get_by_short_code(short_code)
+        if not url:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invalid link."
+            )
 
-                if not url:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Invalid link."
-                    )
-
+        try:
+            with redirect_semaphore:
                 log_entry = Log(
                     url_id=url.id,
                     ip_address=ip,
@@ -70,10 +68,17 @@ class URLService:
 
                 self.db.commit()
 
-                return url.original_url
+            return url.original_url
 
-            except IntegrityError:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to update URL statistics."
-                )
+        except IntegrityError:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update URL statistics."
+            )
+
+        except SemaphoreLimitExceeded:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many concurrent requests. Please try again later."
+            )
